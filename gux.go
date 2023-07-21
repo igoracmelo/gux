@@ -9,6 +9,7 @@ type Ctx struct {
 	W    http.ResponseWriter
 	R    *http.Request
 	Vars map[string]string
+	Data map[string]any
 }
 
 type HandlerFunc func(c *Ctx)
@@ -42,6 +43,7 @@ func (m *Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			W:    w,
 			R:    r,
 			Vars: vars,
+			Data: map[string]any{},
 		}
 		route.fn(ctx)
 		return

@@ -27,10 +27,12 @@ type mux struct {
 
 func New() *mux {
 	return &mux{
-		NotFound: func(c *Ctx) {
-			http.Error(c.W, c.R.URL.Path+" not found", http.StatusNotFound)
-		},
+		NotFound: NotFound,
 	}
+}
+
+func NotFound(c *Ctx) {
+	http.Error(c.W, c.R.URL.Path+" not found", http.StatusNotFound)
 }
 
 var _ http.Handler = (*mux)(nil)

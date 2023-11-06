@@ -1,18 +1,20 @@
-package gux
+package gux_test
 
 import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/igoracmelo/gux"
 )
 
 func Test(t *testing.T) {
 	t.Run("must return not found", func(t *testing.T) {
-		mux := &Mux{}
-		mux.Get("/some/path", func(c *Ctx) {
+		mux := gux.New()
+		mux.Get("/some/path", func(c *gux.Ctx) {
 			c.W.WriteHeader(http.StatusAccepted)
 		})
-		mux.Get("/some/other/path", func(c *Ctx) {
+		mux.Get("/some/other/path", func(c *gux.Ctx) {
 			c.W.WriteHeader(http.StatusAccepted)
 		})
 
@@ -30,14 +32,14 @@ func Test(t *testing.T) {
 	})
 
 	t.Run("should return not allowed", func(t *testing.T) {
-		mux := &Mux{}
-		mux.Post("/user", func(c *Ctx) {
+		mux := gux.New()
+		mux.Post("/user", func(c *gux.Ctx) {
 			c.W.WriteHeader(http.StatusAccepted)
 		})
-		mux.Put("/user", func(c *Ctx) {
+		mux.Put("/user", func(c *gux.Ctx) {
 			c.W.WriteHeader(http.StatusAccepted)
 		})
-		mux.Get("/user/:id", func(c *Ctx) {
+		mux.Get("/user/:id", func(c *gux.Ctx) {
 			c.W.WriteHeader(http.StatusAccepted)
 		})
 
@@ -49,10 +51,10 @@ func Test(t *testing.T) {
 	})
 
 	t.Run("should match equal paths", func(t *testing.T) {
-		mux := &Mux{}
+		mux := gux.New()
 
 		ok := false
-		mux.Head("/courses", func(c *Ctx) {
+		mux.Head("/courses", func(c *gux.Ctx) {
 			ok = true
 		})
 		mux.ServeHTTP(nil, httptest.NewRequest("HEAD", "/courses", nil))
@@ -61,7 +63,7 @@ func Test(t *testing.T) {
 		}
 
 		ok = false
-		mux.Delete("/users", func(c *Ctx) {
+		mux.Delete("/users", func(c *gux.Ctx) {
 			ok = true
 		})
 		mux.ServeHTTP(nil, httptest.NewRequest("DELETE", "/users", nil))
@@ -71,10 +73,10 @@ func Test(t *testing.T) {
 	})
 
 	t.Run("should parse path variables", func(t *testing.T) {
-		mux := &Mux{}
+		mux := gux.New()
 
 		ok := false
-		mux.Put("/courses/:id", func(c *Ctx) {
+		mux.Put("/courses/:id", func(c *gux.Ctx) {
 			id := c.Vars["id"]
 			if id != "10" {
 				t.Errorf("id - want: 10, got: %s", id)
@@ -89,7 +91,7 @@ func Test(t *testing.T) {
 		}
 
 		ok = false
-		mux.Patch("/course/:courseID/lesson/:lessonID", func(c *Ctx) {
+		mux.Patch("/course/:courseID/lesson/:lessonID", func(c *gux.Ctx) {
 			courseID := c.Vars["courseID"]
 			lessonID := c.Vars["lessonID"]
 
@@ -105,6 +107,21 @@ func Test(t *testing.T) {
 		mux.ServeHTTP(nil, httptest.NewRequest("PATCH", "/course/1/lesson/2", nil))
 		if !ok {
 			t.Error("PATCH /course/:courseID/lesson/:lessonID not reached")
+		}
+	})
+
+	t.Run("should call GET handler when HEAD request is done", func(t *testing.T) {
+		mux := gux.New()
+
+		ok := false
+		mux.Get("/head-me", func(c *gux.Ctx) {
+			ok = true
+		})
+
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, httptest.NewRequest("HEAD", "/head-me", nil))
+		if !ok {
+			t.Error("HEAD /head-me not reached")
 		}
 	})
 }

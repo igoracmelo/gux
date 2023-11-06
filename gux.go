@@ -20,36 +20,47 @@ type route struct {
 	fn     HandlerFunc
 }
 
-type Mux struct {
-	routes []route
+type mux struct {
+	routes   []route
+	NotFound HandlerFunc
 }
 
-var _ http.Handler = (*Mux)(nil)
+func New() *mux {
+	return &mux{
+		NotFound: func(c *Ctx) {
+			http.Error(c.W, c.R.URL.Path+" not found", http.StatusNotFound)
+		},
+	}
+}
 
-// TODO: automatic OPTIONS
-func (m *Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	status := http.StatusNotFound
+var _ http.Handler = (*mux)(nil)
+
+func (m *mux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	defaultHandler := m.NotFound
+	ctx := &Ctx{
+		W:    w,
+		R:    req,
+		Data: map[string]any{},
+	}
 
 	for _, route := range m.routes {
-		vars, ok := parseUrlVars(r.URL.Path, route.path)
+		vars, ok := parseUrlVars(req.URL.Path, route.path)
 		if !ok {
 			continue
 		}
-		if r.Method != route.method {
-			status = http.StatusMethodNotAllowed
-			continue
+		ctx.Vars = vars
+
+		if req.Method == route.method || req.Method == "HEAD" && route.method == "GET" {
+			route.fn(ctx)
+			return
+		} else {
+			defaultHandler = func(c *Ctx) {
+				c.W.WriteHeader(http.StatusMethodNotAllowed)
+			}
 		}
-		ctx := &Ctx{
-			W:    w,
-			R:    r,
-			Vars: vars,
-			Data: map[string]any{},
-		}
-		route.fn(ctx)
-		return
 	}
 
-	w.WriteHeader(status)
+	defaultHandler(ctx)
 }
 
 func parseUrlVars(got string, pattern string) (map[string]string, bool) {
@@ -62,7 +73,7 @@ func parseUrlVars(got string, pattern string) (map[string]string, bool) {
 	patternChunks := strings.Split(pattern, "/")
 
 	if len(gotChunks) != len(patternChunks) {
-		return nil, false
+		return vars, false
 	}
 
 	for i := 0; i < len(gotChunks); i++ {
@@ -73,7 +84,7 @@ func parseUrlVars(got string, pattern string) (map[string]string, bool) {
 			continue
 		}
 		if patternChunk[0] != ':' {
-			return nil, false
+			return vars, false
 		}
 
 		varName := strings.TrimPrefix(patternChunk, ":")
@@ -83,7 +94,7 @@ func parseUrlVars(got string, pattern string) (map[string]string, bool) {
 	return vars, true
 }
 
-func (m *Mux) Handle(method, path string, fn HandlerFunc) {
+func (m *mux) Handle(method, path string, fn HandlerFunc) {
 	m.routes = append(m.routes, route{
 		method,
 		path,
@@ -93,26 +104,26 @@ func (m *Mux) Handle(method, path string, fn HandlerFunc) {
 
 // Convenient functions
 
-func (m *Mux) Head(path string, fn HandlerFunc) {
+func (m *mux) Head(path string, fn HandlerFunc) {
 	m.Handle("HEAD", path, fn)
 }
 
-func (m *Mux) Get(path string, fn HandlerFunc) {
+func (m *mux) Get(path string, fn HandlerFunc) {
 	m.Handle("GET", path, fn)
 }
 
-func (m *Mux) Post(path string, fn HandlerFunc) {
+func (m *mux) Post(path string, fn HandlerFunc) {
 	m.Handle("POST", path, fn)
 }
 
-func (m *Mux) Patch(path string, fn HandlerFunc) {
+func (m *mux) Patch(path string, fn HandlerFunc) {
 	m.Handle("PATCH", path, fn)
 }
 
-func (m *Mux) Put(path string, fn HandlerFunc) {
+func (m *mux) Put(path string, fn HandlerFunc) {
 	m.Handle("PUT", path, fn)
 }
 
-func (m *Mux) Delete(path string, fn HandlerFunc) {
+func (m *mux) Delete(path string, fn HandlerFunc) {
 	m.Handle("DELETE", path, fn)
 }
